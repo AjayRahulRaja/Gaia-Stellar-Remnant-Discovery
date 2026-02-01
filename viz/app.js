@@ -14,7 +14,7 @@ async function init() {
     // 1. Setup Scene
     scene = new THREE.Scene();
     scene.background = new THREE.Color(0x020205);
-    scene.fog = new THREE.FogExp2(0x020205, 0.002);
+    scene.fog = new THREE.FogExp2(0x020205, 0.0002); // Reduced fog to prevent black screen
 
     camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 10000);
     camera.position.set(200, 200, 200);
@@ -72,12 +72,13 @@ async function init() {
     }
 
     // 5. Add Selection Marker
-    const selectionGeometry = new THREE.SphereGeometry(12, 16, 16);
+    // 5. Add Selection Marker (Cyan Crosshair)
+    const selectionGeometry = new THREE.RingGeometry(8, 10, 32);
     const selectionMaterial = new THREE.MeshBasicMaterial({
-        color: 0xffff00,
-        wireframe: true,
+        color: 0x00ffff, // Cyan
+        side: THREE.DoubleSide,
         transparent: true,
-        opacity: 0.6
+        opacity: 0.8
     });
     window.selectionMarker = new THREE.Mesh(selectionGeometry, selectionMaterial);
     window.selectionMarker.visible = false;
@@ -245,6 +246,8 @@ function onStarClick(event) {
         const candidates = allStarsData.filter(s => s.is_candidate);
         const selected = candidates[index];
 
+        console.log("Selected Star:", selected); // Debugging
+
         // Update highlight marker
         window.selectionMarker.position.copy(intersects[0].point);
         window.selectionMarker.visible = true;
@@ -298,8 +301,10 @@ function animate() {
     controls.update();
 
     if (window.selectionMarker && window.selectionMarker.visible) {
-        const time = performance.now() * 0.005;
-        const s = 1.0 + Math.sin(time) * 0.2;
+        window.selectionMarker.lookAt(camera.position); // Always face camera
+
+        const time = performance.now() * 0.003;
+        const s = 1.0 + Math.sin(time) * 0.1;
         window.selectionMarker.scale.set(s, s, s);
     }
 
