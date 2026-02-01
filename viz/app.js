@@ -5,7 +5,7 @@ let scene, camera, renderer, controls;
 let starPoints, candidatesPoints;
 const mouse = new THREE.Vector2();
 const raycaster = new THREE.Raycaster();
-raycaster.params.Points.threshold = 10; // Increase hit area for easier clicking
+raycaster.params.Points.threshold = 20; // Maximum hit area for reliable clicking
 let allStarsData = [];
 
 init();
@@ -14,7 +14,7 @@ async function init() {
     // 1. Setup Scene
     scene = new THREE.Scene();
     scene.background = new THREE.Color(0x020205);
-    scene.fog = new THREE.FogExp2(0x020205, 0.0002); // Reduced fog to prevent black screen
+    // Removed fog entirely to prevent black screen issues
 
     camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 10000);
     camera.position.set(200, 200, 200);
@@ -73,12 +73,13 @@ async function init() {
 
     // 5. Add Selection Marker
     // 5. Add Selection Marker (Cyan Crosshair)
-    const selectionGeometry = new THREE.RingGeometry(8, 10, 32);
+    // 5. Add Selection Marker (Cyan Crosshair)
+    const selectionGeometry = new THREE.RingGeometry(12, 16, 32); // Larger marker
     const selectionMaterial = new THREE.MeshBasicMaterial({
-        color: 0x00ffff, // Cyan
+        color: 0x00ffff,
         side: THREE.DoubleSide,
         transparent: true,
-        opacity: 0.8
+        opacity: 1.0
     });
     window.selectionMarker = new THREE.Mesh(selectionGeometry, selectionMaterial);
     window.selectionMarker.visible = false;
@@ -114,12 +115,12 @@ function addCosmicEnvironment() {
     starGeometry.setAttribute('color', new THREE.Float32BufferAttribute(starColors, 3));
 
     const starMaterial = new THREE.PointsMaterial({
-        size: 1.2,
+        size: 3.0, // Increased size for visibility
         vertexColors: true,
         transparent: true,
         opacity: 0.9,
         sizeAttenuation: false,
-        fog: false // Background stars should ignore fog
+        fog: false
     });
 
     const worldStars = new THREE.Points(starGeometry, starMaterial);
