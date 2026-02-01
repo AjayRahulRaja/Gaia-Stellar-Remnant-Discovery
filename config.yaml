@@ -1,0 +1,154 @@
+# Configuration for Gaia Stellar Remnant Detection Pipeline
+
+# Data Sources
+data:
+  # Source of Gaia data
+  source_type: "local"  # Options: "local", "tap_query", "hdf5"
+  local_path: "data/gaia_sample.parquet"
+  
+  # For TAP queries (if source_type == "tap_query")
+  tap_url: "https://gea.esac.esa.int/tap-server/tap"
+  adql_query: null  # Will be generated based on filters below
+  
+  # Initial quality filters (applied at data loading)
+  quality_filters:
+    parallax_over_error_min: 5.0  # Basic parallax quality
+    phot_g_mean_mag_max: 18.0  # Brightness limit for good photometry
+    astrometric_params_solved: 31  # Full 5-parameter solution
+
+# Features to extract and use
+features:
+  # Core astrometry (always required)
+  required:
+    - ra
+    - dec
+    - parallax
+    - parallax_error
+    - pmra
+    - pmdec
+  
+  # Optional but important
+  optional:
+    - radial_velocity
+    - radial_velocity_error
+    
+  # Quality indicators
+  quality:
+    - ruwe
+    - astrometric_excess_noise
+    - astrometric_excess_noise_sig
+    - ipd_frac_multi_peak
+    - ipd_gof_harmonic_amplitude
+    - visibility_periods_used
+    - non_single_star
+    - duplicated_source
+  
+  # Photometry (for sanity checks)
+  photometry:
+    - phot_g_mean_mag
+    - bp_rp
+    - phot_bp_rp_excess_factor
+  
+  # Derived (will be computed)
+  derived:
+    - distance
+    - distance_error
+    - tangential_velocity
+    - total_velocity
+
+# Training Set Selection
+training_set:
+  # Primary single-star criterion
+  ruwe_max: 1.2
+  
+  # Secondary quality filters
+  ipd_frac_multi_peak_max: 0.1
+  astrometric_excess_noise_max: 1.0
+  parallax_over_error_min: 10.0
+  visibility_periods_used_min: 8
+  
+  # Flags
+  exclude_nss_flag: true
+  exclude_duplicated_source: true
+  exclude_acceleration: false  # Set true if acceleration data available
+  
+  # Train/validation split
+  validation_fraction: 0.1
+  random_seed: 42
+
+# Model Architecture
+model:
+  type: "autoencoder"  # Options: "autoencoder", "vae"
+  
+  # Architecture
+  encoder_dims: [32, 16, 8]  # Hidden layer sizes
+  latent_dim: 8
+  decoder_dims: [16, 32]  # Symmetric to encoder
+  
+  # Activation functions
+  activation: "relu"
+  latent_activation: "linear"  # "linear" for AE, will be overridden for VAE
+  
+  # Training
+  batch_size: 128
+  epochs: 50
+  learning_rate: 0.001
+  early_stopping_patience: 10
+  
+  # Regularization
+  dropout_rate: 0.1
+  l2_regularization: 0.0001
+  
+  # Loss weights (for different feature groups)
+  loss_weights:
+    astrometry: 1.0
+    quality: 0.5
+    photometry: 0.3
+    derived: 1.0
+
+# Anomaly Scoring
+scoring:
+  # Score combination weights
+  reconstruction_weight: 0.7
+  latent_distance_weight: 0.3
+  
+  # Candidate selection
+  min_percentile: 99.0  # Top 1%
+  top_n_export: 1000
+  
+  # Category filtering (leave empty for all categories)
+  category_filter: null  # Options: "astrometric_binary", "kinematic_outlier", etc.
+
+# Output
+output:
+  output_dir: "results/"
+  
+  # File naming
+  model_save_path: "results/models/autoencoder_model.pkl"
+  normalizer_save_path: "results/models/feature_normalizer.pkl"
+  
+  # Results
+  candidates_csv: "results/top_candidates.csv"
+  scores_npz: "results/anomaly_scores.npz"
+  
+  # Diagnostics
+  training_summary: "results/training_summary.txt"
+  feature_stats: "results/feature_statistics.json"
+
+# Validation
+validation:
+  # Create a "known binary" holdout set for validation
+  create_binary_holdout: true
+  binary_ruwe_min: 1.4
+  
+  # Performance metrics to track
+  track_metrics:
+    - reconstruction_loss
+    - latent_space_coverage
+    - binary_recall  # What fraction of known binaries are in top candidates
+
+# Computational
+compute:
+  device: "auto"  # Options: "cpu", "gpu", "auto"
+  num_workers: 4  # For data loading
+  use_mixed_precision: false
