@@ -2,10 +2,10 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 let scene, camera, renderer, controls;
-let starPoints, candidatesPoints;
+let starPoints, candidatesPoints, worldStars; // Global worldStars for animation
 const mouse = new THREE.Vector2();
 const raycaster = new THREE.Raycaster();
-raycaster.params.Points.threshold = 20; // Maximum hit area for reliable clicking
+raycaster.params.Points.threshold = 30; // Very high threshold for easy clicking
 let allStarsData = [];
 
 init();
@@ -123,10 +123,38 @@ function addCosmicEnvironment() {
         fog: false
     });
 
-    const worldStars = new THREE.Points(starGeometry, starMaterial);
+    const starMaterial = new THREE.PointsMaterial({
+        size: 3.0,
+        vertexColors: true,
+        transparent: true,
+        opacity: 0.9,
+        sizeAttenuation: false,
+        fog: false
+    });
+
+    worldStars = new THREE.Points(starGeometry, starMaterial);
     scene.add(worldStars);
 
-    // 2. Nebula Glows (Artistic)
+    // 2. Add "Sun" Label at Origin
+    const sunDiv = document.createElement('div');
+    sunDiv.className = 'sun-label';
+    sunDiv.textContent = 'Sun (Origin)';
+    sunDiv.style.position = 'absolute';
+    sunDiv.style.color = '#ffd700';
+    sunDiv.style.fontWeight = 'bold';
+    sunDiv.style.fontSize = '12px';
+    sunDiv.style.pointerEvents = 'none'; // Don't block clicks
+    sunDiv.style.textShadow = '0 0 5px black';
+    document.body.appendChild(sunDiv);
+    window.sunLabel = sunDiv;
+
+    // Add small visual marker for Sun
+    const sunGeo = new THREE.SphereGeometry(2, 16, 16);
+    const sunMat = new THREE.MeshBasicMaterial({ color: 0xffff00 });
+    const sunMesh = new THREE.Mesh(sunGeo, sunMat);
+    scene.add(sunMesh);
+
+    // 3. Nebula Glows (Artistic)
     const nebulaColors = [0x0a0a25, 0x1a0a35, 0x0a1a35];
     nebulaColors.forEach((color, i) => {
         const nebulaGeometry = new THREE.SphereGeometry(2500 + i * 500, 32, 32);
@@ -301,12 +329,31 @@ function animate() {
     requestAnimationFrame(animate);
     controls.update();
 
+    if (worldStars) {
+        worldStars.position.copy(camera.position); // Lock stars to camera
+    }
+
     if (window.selectionMarker && window.selectionMarker.visible) {
-        window.selectionMarker.lookAt(camera.position); // Always face camera
+        window.selectionMarker.lookAt(camera.position);
 
         const time = performance.now() * 0.003;
         const s = 1.0 + Math.sin(time) * 0.1;
         window.selectionMarker.scale.set(s, s, s);
+    }
+
+    // Update Sun Label Position
+    if (window.sunLabel) {
+        const tempV = new THREE.Vector3(0, 0, 0);
+        tempV.project(camera);
+        const x = (tempV.x * .5 + .5) * window.innerWidth;
+        const y = (tempV.y * -.5 + .5) * window.innerHeight;
+
+        if (tempV.z < 1) { // Only show if in front of camera
+            window.sunLabel.style.transform = `translate(-50%, -50%) translate(${x}px, ${y - 20}px)`;
+            window.sunLabel.style.display = 'block';
+        } else {
+            window.sunLabel.style.display = 'none';
+        }
     }
 
     renderer.render(scene, camera);
