@@ -55,7 +55,10 @@ async function init() {
 
     // 2. Load Data
     try {
-        const response = await fetch('../results/viz_data.json');
+        const response = await fetch('./viz_data.json'); // Fetch from local viz folder
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
         allStarsData = await response.json();
 
         plotStars(allStarsData);
@@ -68,7 +71,8 @@ async function init() {
 
     } catch (error) {
         console.error("Error loading viz data:", error);
-        document.querySelector('#loading-overlay p').textContent = "Error: Please run pipeline.py first.";
+        document.querySelector('#loading-overlay p').textContent = "Error loading data. See console.";
+        alert("Failed to load visualization data. Please check if viz_data.json is present.");
     }
 
     // 5. Add Selection Marker
@@ -123,14 +127,7 @@ function addCosmicEnvironment() {
         fog: false
     });
 
-    const starMaterial = new THREE.PointsMaterial({
-        size: 3.0,
-        vertexColors: true,
-        transparent: true,
-        opacity: 0.9,
-        sizeAttenuation: false,
-        fog: false
-    });
+
 
     worldStars = new THREE.Points(starGeometry, starMaterial);
     scene.add(worldStars);
