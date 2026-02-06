@@ -2,11 +2,13 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 let scene, camera, renderer, controls;
-let starPoints, candidatesPoints, worldStars, nebulaMeshes = []; // Global for animation
+let starPoints, candidatesPoints, worldStars, nebulaMeshes = [];
 const mouse = new THREE.Vector2();
 const raycaster = new THREE.Raycaster();
-raycaster.params.Points.threshold = 30; // Very high threshold for easy clicking
+raycaster.params.Points.threshold = 30;
 let allStarsData = [];
+let selectedStarIndex = null; // Track selected star for color change
+let originalColors = []; // Store original colors
 
 init();
 
@@ -149,20 +151,7 @@ async function init() {
         alert("Failed to load visualization data. Please check if viz_data.json is present.");
     }
 
-    // 5. Add Selection Marker (Enhanced Cyan Crosshair)
-    const selectionGeometry = new THREE.RingGeometry(18, 24, 32); // Much larger and more visible
-    const selectionMaterial = new THREE.MeshBasicMaterial({
-        color: 0x00ffff,
-        side: THREE.DoubleSide,
-        transparent: true,
-        opacity: 1.0,
-        emissive: 0x00ffff,
-        emissiveIntensity: 0.5
-    });
-    window.selectionMarker = new THREE.Mesh(selectionGeometry, selectionMaterial);
-    window.selectionMarker.visible = false;
-    window.selectionMarker.renderOrder = 999; // Always render on top
-    scene.add(window.selectionMarker);
+    // 5. Selection marker removed - using color change instead
 
     // 6. Add Event Listeners
     window.addEventListener('click', onStarClick);
@@ -199,7 +188,7 @@ function addCosmicEnvironment() {
     starGeometry.setAttribute('color', new THREE.Float32BufferAttribute(starColors, 3));
 
     const starMaterial = new THREE.PointsMaterial({
-        size: 3.0, // Increased size for visibility
+        size: 1.5, // Reduced from 3.0 to minimize flickering
         vertexColors: true,
         transparent: true,
         opacity: 0.9,
@@ -212,24 +201,46 @@ function addCosmicEnvironment() {
     worldStars = new THREE.Points(starGeometry, starMaterial);
     scene.add(worldStars);
 
-    // 2. Add "Sun" Label at Origin
+    // 2. Add "Sun" Label at Origin (Static Position)
     const sunDiv = document.createElement('div');
-    sunDiv.className = 'sun-label';
-    sunDiv.textContent = 'Sun (Origin)';
+    sunDiv.textContent = '☉ Sun (Origin)';
     sunDiv.style.position = 'absolute';
-    sunDiv.style.color = '#ffd700';
+    sunDiv.style.left = '50%';
+    sunDiv.style.top = '50%';
+    sunDiv.style.transform = 'translate(-50%, -80px)';
+    sunDiv.style.color = '#ffd700;
     sunDiv.style.fontWeight = 'bold';
-    sunDiv.style.fontSize = '12px';
-    sunDiv.style.pointerEvents = 'none'; // Don't block clicks
-    sunDiv.style.textShadow = '0 0 5px black';
+    sunDiv.style.fontSize = '14px';
+    sunDiv.style.pointerEvents = 'none';
+    sunDiv.style.textShadow = '0 0 10px black, 0 0 5px black';
+    sunDiv.style.zIndex = '100';
+    sunDiv.style.background = 'rgba(0,0,0,0.6)';
+    sunDiv.style.padding = '5px 10px';
+    sunDiv.style.borderRadius = '4px';
     document.body.appendChild(sunDiv);
-    window.sunLabel = sunDiv;
-
-    // Add small visual marker for Sun
-    const sunGeo = new THREE.SphereGeometry(2, 16, 16);
+    
+    const sunGeo = new THREE.SphereGeometry(3, 16, 16);
     const sunMat = new THREE.MeshBasicMaterial({ color: 0xffff00 });
     const sunMesh = new THREE.Mesh(sunGeo, sunMat);
     scene.add(sunMesh);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     // 3. Nebula Glows (Artistic)
     const nebulaColors = [0x0a0a25, 0x1a0a35, 0x0a1a35];
@@ -318,6 +329,9 @@ function plotStars(stars) {
     geometries.candidates.setAttribute('position', new THREE.Float32BufferAttribute(positions.candidates, 3));
     geometries.candidates.setAttribute('color', new THREE.Float32BufferAttribute(colors.candidates, 3));
 
+    // Store original colors for selection/deselection
+    originalColors = [...colors.candidates];
+
     const candidateMaterial = new THREE.PointsMaterial({
         size: 4.0,
         vertexColors: true,
@@ -339,31 +353,6 @@ function onWindowResize() {
     renderer.setSize(window.innerWidth, window.innerHeight);
 }
 
-function onStarClick(event) {
-    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-
-    raycaster.setFromCamera(mouse, camera);
-    const intersects = raycaster.intersectObject(candidatesPoints);
-
-    if (intersects.length > 0) {
-        const index = intersects[0].index;
-        // Find the corresponding star in our data
-        const candidates = allStarsData.filter(s => s.is_candidate);
-        const selected = candidates[index];
-
-        console.log("Selected Star:", selected); // Debugging
-
-        // Update highlight marker
-        window.selectionMarker.position.copy(intersects[0].point);
-        window.selectionMarker.visible = true;
-
-        showStarInfo(selected);
-    } else {
-        document.getElementById('info-panel').style.display = 'none';
-        window.selectionMarker.visible = false;
-    }
-}
 
 function showStarInfo(star) {
     const panel = document.getElementById('info-panel');
@@ -408,35 +397,59 @@ function animate() {
 
     if (worldStars) {
         worldStars.position.copy(camera.position); // Lock stars to camera
-    
-    // Lock nebulas to camera to prevent black screen when inside them
-    nebulaMeshes.forEach(nebula => {
-        nebula.position.copy(camera.position);
-    });
+
+        // Lock nebulas to camera to prevent black screen when inside them
+        nebulaMeshes.forEach(nebula => {
+            nebula.position.copy(camera.position);
+        });
     }
 
-    if (window.selectionMarker && window.selectionMarker.visible) {
-        window.selectionMarker.lookAt(camera.position);
 
-        const time = performance.now() * 0.003;
-        const s = 1.0 + Math.sin(time) * 0.1;
-        window.selectionMarker.scale.set(s, s, s);
-    }
-
-    // Update Sun Label Position
-    if (window.sunLabel) {
-        const tempV = new THREE.Vector3(0, 0, 0);
-        tempV.project(camera);
-        const x = (tempV.x * .5 + .5) * window.innerWidth;
-        const y = (tempV.y * -.5 + .5) * window.innerHeight;
-
-        if (tempV.z < 1) { // Only show if in front of camera
-            window.sunLabel.style.transform = `translate(-50%, -50%) translate(${x}px, ${y - 20}px)`;
-            window.sunLabel.style.display = 'block';
-        } else {
-            window.sunLabel.style.display = 'none';
-        }
-    }
 
     renderer.render(scene, camera);
+}
+function onStarClick(event) {
+    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+    raycaster.setFromCamera(mouse, camera);
+    const intersects = raycaster.intersectObject(candidatesPoints);
+
+    if (intersects.length > 0) {
+        const index = intersects[0].index;
+        const candidates = allStarsData.filter(s => s.is_candidate);
+        const selected = candidates[index];
+
+        console.log("Selected Star:", selected);
+
+        // Restore previous selection's color
+        if (selectedStarIndex !== null) {
+            const colors = candidatesPoints.geometry.attributes.color.array;
+            colors[selectedStarIndex * 3] = originalColors[selectedStarIndex * 3];
+            colors[selectedStarIndex * 3 + 1] = originalColors[selectedStarIndex * 3 + 1];
+            colors[selectedStarIndex * 3 + 2] = originalColors[selectedStarIndex * 3 + 2];
+        }
+
+        // Change selected star to bright yellow
+        const colors = candidatesPoints.geometry.attributes.color.array;
+        colors[index * 3] = 1.0;     // R
+        colors[index * 3 + 1] = 1.0; // G
+        colors[index * 3 + 2] = 0.0; // B (bright yellow)
+        candidatesPoints.geometry.attributes.color.needsUpdate = true;
+
+        selectedStarIndex = index;
+
+        showStarInfo(selected);
+    } else {
+        // Restore color when clicking empty space
+        if (selectedStarIndex !== null) {
+            const colors = candidatesPoints.geometry.attributes.color.array;
+            colors[selectedStarIndex * 3] = originalColors[selectedStarIndex * 3];
+            colors[selectedStarIndex * 3 + 1] = originalColors[selectedStarIndex * 3 + 1];
+            colors[selectedStarIndex * 3 + 2] = originalColors[selectedStarIndex * 3 + 2];
+            candidatesPoints.geometry.attributes.color.needsUpdate = true;
+            selectedStarIndex = null;
+        }
+        document.getElementById('info-panel').style.display = 'none';
+    }
 }
