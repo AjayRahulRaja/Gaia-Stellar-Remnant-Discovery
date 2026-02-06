@@ -201,13 +201,12 @@ function addCosmicEnvironment() {
     worldStars = new THREE.Points(starGeometry, starMaterial);
     scene.add(worldStars);
 
-    // 2. Add "Sun" Label at Origin (Static Position)
+    // 2. Add "Sun" Label at Origin (Dynamic Position)
     const sunDiv = document.createElement('div');
+    sunDiv.className = 'sun-label';
     sunDiv.textContent = '☉ Sun (Origin)';
     sunDiv.style.position = 'absolute';
-    sunDiv.style.left = '50%';
-    sunDiv.style.top = '50%';
-    sunDiv.style.transform = 'translate(-50%, -80px)';
+    // Removed static positioning
     sunDiv.style.color = '#ffd700';
     sunDiv.style.fontWeight = 'bold';
     sunDiv.style.fontSize = '14px';
@@ -217,8 +216,10 @@ function addCosmicEnvironment() {
     sunDiv.style.background = 'rgba(0,0,0,0.6)';
     sunDiv.style.padding = '5px 10px';
     sunDiv.style.borderRadius = '4px';
+    sunDiv.style.display = 'none'; // Hidden until positioned
     document.body.appendChild(sunDiv);
-    
+    window.sunLabel = sunDiv;
+
     const sunGeo = new THREE.SphereGeometry(3, 16, 16);
     const sunMat = new THREE.MeshBasicMaterial({ color: 0xffff00 });
     const sunMesh = new THREE.Mesh(sunGeo, sunMat);
@@ -406,6 +407,21 @@ function animate() {
 
 
 
+    
+    // Update Sun Label Position
+    if (window.sunLabel) {
+        const tempV = new THREE.Vector3(0, 0, 0);
+        tempV.project(camera);
+        const x = (tempV.x * .5 + .5) * window.innerWidth;
+        const y = (tempV.y * -.5 + .5) * window.innerHeight;
+        
+        if (tempV.z < 1) { // Only show if in front of camera
+            window.sunLabel.style.transform = `translate(-50%, -50%) translate(${x}px, ${y - 40}px)`;
+            window.sunLabel.style.display = "block";
+        } else {
+            window.sunLabel.style.display = "none";
+        }
+    }
     renderer.render(scene, camera);
 }
 function onStarClick(event) {
