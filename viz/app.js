@@ -5,7 +5,9 @@ let scene, camera, renderer, controls;
 let starPoints, candidatesPoints, worldStars, nebulaMeshes = [];
 const mouse = new THREE.Vector2();
 const raycaster = new THREE.Raycaster();
-raycaster.params.Points.threshold = 5; // Reduced to 5 for high precision selection
+raycaster.params.Points.threshold = 0.2; // Drastically reduced for pinpoint precision
+let isDragging = false;
+let mouseDownPos = new THREE.Vector2();
 let allStarsData = [];
 let selectedStarIndex = null; // Track selected star for color change
 let originalColors = []; // Store original colors
@@ -160,6 +162,16 @@ async function init() {
     }
 
     // 6. Add Event Listeners
+    // 6. Add Event Listeners
+    window.addEventListener('mousedown', (e) => {
+        mouseDownPos.set(e.clientX, e.clientY);
+        isDragging = false;
+    });
+    window.addEventListener('mouseup', (e) => {
+        const dist = mouseDownPos.distanceTo(new THREE.Vector2(e.clientX, e.clientY));
+        // If moved more than 3 pixels, it's a drag
+        if (dist > 3) isDragging = true;
+    });
     window.addEventListener('click', onStarClick);
     window.addEventListener('mousemove', onMouseMove);
     window.addEventListener('resize', onWindowResize);
@@ -379,6 +391,8 @@ function animate() {
 }
 
 function onStarClick(event) {
+    if (isDragging) return; // Ignore click if dragging
+
     mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
     mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
 
