@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 let scene, camera, renderer, controls;
-let starPoints, candidatesPoints, worldStars; // Global worldStars for animation
+let starPoints, candidatesPoints, worldStars, nebulaMeshes = []; // Global for animation
 const mouse = new THREE.Vector2();
 const raycaster = new THREE.Raycaster();
 raycaster.params.Points.threshold = 30; // Very high threshold for easy clicking
@@ -43,10 +43,84 @@ async function init() {
     };
 
     window.vizScreenshot = () => {
+        const dataUrl = renderer.domElement.toDataURL('image/png');
+
+        // Create toast notification
+        const toast = document.createElement('div');
+        toast.id = 'screenshot-toast';
+        toast.innerHTML = `
+            <div style="background: rgba(10,10,25,0.95); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.2); padding: 20px; border-radius: 12px; position: fixed; bottom: 80px; right: 20px; z-index: 9999; min-width: 250px;">
+                <div style="font-weight: bold; margin-bottom: 10px; color: #4a9eff;">📸 Screenshot Captured</div>
+                <button onclick="window.saveScreenshot('png')" style="width: 100%; margin: 5px 0; padding: 10px; background: #4a9eff; border: none; color: white; border-radius: 6px; cursor: pointer; font-size: 14px;">💾 Save as PNG</button>
+                <button onclick="window.saveScreenshot('jpg')" style="width: 100%; margin: 5px 0; padding: 10px; background: rgba(60,60,90,0.8); border: 1px solid rgba(255,255,255,0.2); color: white; border-radius: 6px; cursor: pointer; font-size: 14px;">💾 Save as JPG</button>
+                <button onclick="window.shareScreenshot()" style="width: 100%; margin: 5px 0; padding: 10px; background: rgba(60,60,90,0.8); border: 1px solid rgba(255,255,255,0.2); color: white; border-radius: 6px; cursor: pointer; font-size: 14px;">🔗 Share</button>
+            </div>
+        `;
+        document.body.appendChild(toast);
+
+        // Store data URL globally
+        window.currentScreenshot = dataUrl;
+
+        // Auto-remove after 5 seconds
+        setTimeout(() => {
+            if (toast.parentNode) toast.remove();
+        }, 5000);
+    };
+
+    window.saveScreenshot = (format) => {
         const link = document.createElement('a');
-        link.download = `gaia_discovery_${Date.now()}.png`;
-        link.href = renderer.domElement.toDataURL('image/png');
-        link.click();
+        link.download = `gaia_discovery_${Date.now()}.${format}`;
+
+        if (format === 'jpg') {
+            // Convert PNG to JPG
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                canvas.width = img.width;
+                canvas.height = img.height;
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = '#000000';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(img, 0, 0);
+                link.href = canvas.toDataURL('image/jpeg', 0.95);
+                link.click();
+            };
+            img.src = window.currentScreenshot;
+        } else {
+            link.href = window.currentScreenshot;
+            link.click();
+        }
+
+        // Remove toast
+        const toast = document.getElementById('screenshot-toast');
+        if (toast) toast.remove();
+    };
+
+    window.shareScreenshot = async () => {
+        try {
+            const blob = await (await fetch(window.currentScreenshot)).blob();
+            const file = new File([blob], `gaia_discovery_${Date.now()}.png`, { type: 'image/png' });
+
+            if (navigator.share && navigator.canShare({ files: [file] })) {
+                await navigator.share({
+                    files: [file],
+                    title: 'Gaia Stellar Remnant Discovery',
+                    text: 'Check out this stellar discovery visualization!'
+                });
+            } else {
+                // Fallback: copy to clipboard
+                const item = new ClipboardItem({ 'image/png': blob });
+                await navigator.clipboard.write([item]);
+                alert('Screenshot copied to clipboard!');
+            }
+        } catch (err) {
+            console.error('Share failed:', err);
+            alert('Sharing not supported. Use Save instead.');
+        }
+
+        // Remove toast
+        const toast = document.getElementById('screenshot-toast');
+        if (toast) toast.remove();
     };
     // -------------------------
 
@@ -75,19 +149,25 @@ async function init() {
         alert("Failed to load visualization data. Please check if viz_data.json is present.");
     }
 
-    // 5. Add Selection Marker
-    // 5. Add Selection Marker (Cyan Crosshair)
-    // 5. Add Selection Marker (Cyan Crosshair)
-    const selectionGeometry = new THREE.RingGeometry(12, 16, 32); // Larger marker
+    // 5. Add Selection Marker (Enhanced Cyan Crosshair)
+    const selectionGeometry = new THREE.RingGeometry(18, 24, 32); // Much larger and more visible
     const selectionMaterial = new THREE.MeshBasicMaterial({
         color: 0x00ffff,
         side: THREE.DoubleSide,
         transparent: true,
-        opacity: 1.0
+        opacity: 1.0,
+        emissive: 0x00ffff,
+        emissiveIntensity: 0.5
     });
     window.selectionMarker = new THREE.Mesh(selectionGeometry, selectionMaterial);
     window.selectionMarker.visible = false;
+    window.selectionMarker.renderOrder = 999; // Always render on top
     scene.add(window.selectionMarker);
+
+    // 6. Add Event Listeners
+    window.addEventListener('click', onStarClick);
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('resize', onWindowResize);
 
     animate();
 }
@@ -163,7 +243,7 @@ function addCosmicEnvironment() {
             fog: false
         });
         const nebula = new THREE.Mesh(nebulaGeometry, nebulaMaterial);
-        scene.add(nebula);
+        nebulaMeshes.push(nebula); scene.add(nebula);
     });
 }
 
@@ -328,6 +408,11 @@ function animate() {
 
     if (worldStars) {
         worldStars.position.copy(camera.position); // Lock stars to camera
+    
+    // Lock nebulas to camera to prevent black screen when inside them
+    nebulaMeshes.forEach(nebula => {
+        nebula.position.copy(camera.position);
+    });
     }
 
     if (window.selectionMarker && window.selectionMarker.visible) {
