@@ -5,7 +5,7 @@ let scene, camera, renderer, controls;
 let starPoints, candidatesPoints, worldStars, nebulaMeshes = [];
 const mouse = new THREE.Vector2();
 const raycaster = new THREE.Raycaster();
-raycaster.params.Points.threshold = 10; // Reduced from 30 for more precision
+raycaster.params.Points.threshold = 5; // Reduced to 5 for high precision selection
 let allStarsData = [];
 let selectedStarIndex = null; // Track selected star for color change
 let originalColors = []; // Store original colors
@@ -31,6 +31,15 @@ async function init() {
     controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.05;
+
+    // Cursor handling for dragging
+    renderer.domElement.style.cursor = 'grab';
+    controls.addEventListener('start', () => {
+        renderer.domElement.style.cursor = 'grabbing';
+    });
+    controls.addEventListener('end', () => {
+        renderer.domElement.style.cursor = 'grab';
+    });
 
     // --- GLOBAL VIZ CONTROLS ---
     window.vizZoom = (factor) => {
@@ -222,7 +231,14 @@ function onMouseMove(event) {
     if (intersects.length > 0) {
         document.body.style.cursor = 'pointer';
     } else {
-        document.body.style.cursor = 'default';
+        // Only set to grab if not currently dragging (OrbitControls handles grabbing)
+        // But checking controls.state is tricky, so we just revert to default logic
+        // logic: if mouse down -> grabbing (handled by controls listeners), else grab
+        // However, onMouseMove fires constantly.
+        // We defer to CSS/Controls logic unless hovering a star
+        if (renderer.domElement.style.cursor !== 'grabbing') {
+            renderer.domElement.style.cursor = 'grab';
+        }
     }
 }
 
