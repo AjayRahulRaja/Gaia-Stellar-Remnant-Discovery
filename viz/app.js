@@ -5,7 +5,7 @@ let scene, camera, renderer, controls;
 let starPoints, candidatesPoints, worldStars, nebulaMeshes = [];
 const mouse = new THREE.Vector2();
 const raycaster = new THREE.Raycaster();
-raycaster.params.Points.threshold = 0.2; // Drastically reduced for pinpoint precision
+raycaster.params.Points.threshold = 1.5; // Calibrated to 1.5 for optimal precision/usability balance
 let isDragging = false;
 let mouseDownPos = new THREE.Vector2();
 let allStarsData = [];
@@ -169,8 +169,8 @@ async function init() {
     });
     window.addEventListener('mouseup', (e) => {
         const dist = mouseDownPos.distanceTo(new THREE.Vector2(e.clientX, e.clientY));
-        // If moved more than 3 pixels, it's a drag
-        if (dist > 3) isDragging = true;
+        // If moved more than 5 pixels, it's a drag (relaxed from 3 for jitter tolerance)
+        if (dist > 5) isDragging = true;
     });
     window.addEventListener('click', onStarClick);
     window.addEventListener('mousemove', onMouseMove);
