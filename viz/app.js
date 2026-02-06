@@ -208,7 +208,7 @@ function addCosmicEnvironment() {
     sunDiv.style.left = '50%';
     sunDiv.style.top = '50%';
     sunDiv.style.transform = 'translate(-50%, -80px)';
-    sunDiv.style.color = '#ffd700;
+    sunDiv.style.color = '#ffd700';
     sunDiv.style.fontWeight = 'bold';
     sunDiv.style.fontSize = '14px';
     sunDiv.style.pointerEvents = 'none';
